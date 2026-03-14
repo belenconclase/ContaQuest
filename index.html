@@ -128,7 +128,7 @@
                 <p id="login-error" class="hidden text-red-500 font-bold mb-2 text-sm bg-red-50 p-2 rounded-lg"></p>
                 
                 <input type="text" id="student-name" placeholder="Tu nombre o alias" class="w-full mb-4 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-indigo-500 outline-none transition-colors">
-                <input type="text" id="class-code" placeholder="Código de clase (ej: 1DAM)" class="w-full mb-6 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-indigo-500 outline-none uppercase transition-colors">
+                <input type="text" id="class-code" placeholder="Código de clase (ej: 1ADG301)" class="w-full mb-6 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-indigo-500 outline-none uppercase transition-colors">
                 
                 <button onclick="loginStudent()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-xl btn-game text-lg hover:bg-indigo-500">Entrar a Clase</button>
             </div>
@@ -194,7 +194,7 @@
                 </h2>
                 <div class="bg-white rounded-3xl p-6 card-shadow min-h-[150px]">
                     <ul id="leaderboard-list" class="space-y-3">
-                        <li class="text-center text-slate-500 font-bold py-4">Modo local (Ranking Offline)</li>
+                        <li class="text-center text-slate-500 font-bold py-4">Conectando...</li>
                     </ul>
                 </div>
             </div>
@@ -599,7 +599,6 @@
             if(newRankIdx > appState.rankIdx) {
                 appState.rankIdx = newRankIdx;
                 playSound('levelup');
-                alert(`🎉 ¡Enhorabuena! Has ascendido a ${RANKS[newRankIdx].name}`);
             }
             updateDashboard();
 
@@ -1118,7 +1117,7 @@
         showView('login');
     </script>
 
-    <!-- SISTEMA MULTIJUGADOR (FIREBASE) -->
+    <!-- SISTEMA MULTIJUGADOR (FIREBASE Y MODO OFFLINE SIMULADO) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -1126,11 +1125,20 @@
 
         let db, auth, currentUser;
         let unsubLeaderboard = null;
+        let isOfflineMode = false;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'contaquest-default';
 
-        function setLocalMode() {
-            document.getElementById('leaderboard-list').innerHTML = '<li class="text-center text-slate-500 font-bold py-4">Modo local (Ranking Offline)</li>';
-        }
+        // --- BASE DE DATOS SIMULADA PARA GITHUB PAGES ---
+        const MOCK_DATABASE = {
+            "1ADG301": [
+                { uid: "mock1", name: "María G.", xp: 1250, rank: "Director Financiero" },
+                { uid: "mock2", name: "Carlos R.", xp: 850, rank: "Jefe de Contabilidad" },
+                { uid: "mock3", name: "Lucía M.", xp: 420, rank: "Contable" },
+                { uid: "mock4", name: "Javier T.", xp: 150, rank: "Auxiliar Administrativo" },
+                { uid: "mock5", name: "Ana S.", xp: 50, rank: "Becario Contable" }
+            ]
+        };
+        let currentOfflinePlayers = [];
 
         try {
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
@@ -1150,44 +1158,69 @@
 
                 onAuthStateChanged(auth, (user) => {
                     currentUser = user;
-                    // Si el usuario se logueó antes de que cargara la DB, sincronizamos ahora
                     if (user && window.appState && window.appState.playerName) {
                         syncToLeaderboard(window.appState);
                         listenToLeaderboard(window.appState.classCode);
                     }
                 });
-
-                // Escuchar eventos desde el juego principal
-                window.addEventListener('player-login', (e) => {
-                    const state = e.detail;
-                    if(currentUser) {
-                        syncToLeaderboard(state);
-                        listenToLeaderboard(state.classCode);
-                    }
-                });
-
-                window.addEventListener('xp-updated', (e) => {
-                    const state = e.detail;
-                    if(currentUser && state.playerName) {
-                        syncToLeaderboard(state);
-                    }
-                });
             } else {
-                // No hay credenciales inyectadas, forzamos modo local
-                setLocalMode();
+                // Activar modo simulador si no hay credenciales (GitHub)
+                isOfflineMode = true;
             }
         } catch (error) {
-            console.warn("Firebase no está disponible. Jugando en modo local.", error);
-            setLocalMode();
+            console.warn("Firebase no está disponible. Entrando en modo simulador.", error);
+            isOfflineMode = true;
         }
 
+        // Eventos del juego
+        window.addEventListener('player-login', (e) => {
+            const state = e.detail;
+            if(isOfflineMode) {
+                listenToLeaderboard(state.classCode);
+            } else if(currentUser) {
+                syncToLeaderboard(state);
+                listenToLeaderboard(state.classCode);
+            }
+        });
+
+        window.addEventListener('xp-updated', (e) => {
+            const state = e.detail;
+            if(isOfflineMode) {
+                syncToLeaderboard(state);
+            } else if(currentUser && state.playerName) {
+                syncToLeaderboard(state);
+            }
+        });
+
         function syncToLeaderboard(state) {
-            if(!currentUser || !db || !state.classCode) return;
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', state.classCode, currentUser.uid);
-            
             let rankName = "Becario Contable";
             try { rankName = window.RANKS[state.rankIdx].name; } catch(e){}
 
+            // SI ESTAMOS EN GITHUB (MODO OFFLINE/SIMULADOR)
+            if (isOfflineMode) {
+                let playerIndex = currentOfflinePlayers.findIndex(p => p.uid === 'local-user');
+                if (playerIndex >= 0) {
+                    currentOfflinePlayers[playerIndex].xp = state.xp;
+                    currentOfflinePlayers[playerIndex].rank = rankName;
+                    currentOfflinePlayers[playerIndex].name = state.playerName;
+                } else {
+                    currentOfflinePlayers.push({
+                        uid: 'local-user',
+                        name: state.playerName,
+                        xp: state.xp,
+                        rank: rankName
+                    });
+                }
+                
+                // Ordenar y mostrar
+                const sorted = [...currentOfflinePlayers].sort((a, b) => b.xp - a.xp);
+                renderLeaderboard(sorted);
+                return;
+            }
+
+            // SI ESTAMOS EN SERVIDOR REAL
+            if(!currentUser || !db || !state.classCode) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', state.classCode, currentUser.uid);
             setDoc(docRef, {
                 name: state.playerName,
                 xp: state.xp,
@@ -1197,10 +1230,24 @@
         }
 
         function listenToLeaderboard(classCode) {
+            // SI ESTAMOS EN GITHUB (MODO OFFLINE/SIMULADOR)
+            if (isOfflineMode) {
+                // Si la clase ingresada es 1ADG301 (o la que hayamos simulado), cargar a los bots
+                if (MOCK_DATABASE[classCode]) {
+                    // Clonar los datos para no modificar el original
+                    currentOfflinePlayers = JSON.parse(JSON.stringify(MOCK_DATABASE[classCode]));
+                } else {
+                    currentOfflinePlayers = [];
+                }
+                // Añadir al jugador local a la lista y renderizar
+                syncToLeaderboard(window.appState);
+                return;
+            }
+
+            // SI ESTAMOS EN SERVIDOR REAL
             if(!currentUser || !db || !classCode) return;
             if(unsubLeaderboard) unsubLeaderboard();
 
-            // Solo mostramos "Conectando" si realmente hay conexión a la base de datos
             document.getElementById('leaderboard-list').innerHTML = `
                 <li class="text-center text-slate-500 font-bold py-4 flex flex-col items-center">
                     <span class="text-3xl mb-2 animate-spin">⏳</span>
@@ -1209,16 +1256,11 @@
             `;
 
             const colRef = collection(db, 'artifacts', appId, 'public', 'data', classCode);
-            
             unsubLeaderboard = onSnapshot(colRef, (snapshot) => {
                 const players = [];
                 snapshot.forEach(doc => players.push(doc.data()));
-                
-                // Ordenar por XP de mayor a menor
                 players.sort((a, b) => b.xp - a.xp);
                 renderLeaderboard(players);
-            }, (error) => {
-                console.error("Error leyendo ranking:", error);
             });
         }
 
@@ -1237,7 +1279,8 @@
                 else if(index === 1) medal = '<span class="text-2xl w-8 inline-block text-center drop-shadow-sm" title="Plata">🥈</span>';
                 else if(index === 2) medal = '<span class="text-2xl w-8 inline-block text-center drop-shadow-sm" title="Bronce">🥉</span>';
                 
-                const isMe = p.uid === currentUser.uid;
+                // Reconocer al usuario local
+                const isMe = p.uid === (currentUser ? currentUser.uid : 'local-user');
                 const bgClass = isMe ? 'bg-indigo-50 border-2 border-indigo-200 shadow-sm' : 'bg-slate-50 border-2 border-slate-100 hover:border-slate-300 transition-colors';
                 const nameColor = isMe ? 'text-indigo-900' : 'text-slate-700';
 
