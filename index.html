@@ -194,10 +194,7 @@
                 </h2>
                 <div class="bg-white rounded-3xl p-6 card-shadow min-h-[150px]">
                     <ul id="leaderboard-list" class="space-y-3">
-                        <li class="text-center text-slate-500 font-bold py-4 flex flex-col items-center">
-                            <span class="text-3xl mb-2 animate-spin">⏳</span>
-                            Conectando con la clase...
-                        </li>
+                        <li class="text-center text-slate-500 font-bold py-4">Modo local (Ranking Offline)</li>
                     </ul>
                 </div>
             </div>
@@ -1202,6 +1199,14 @@
         function listenToLeaderboard(classCode) {
             if(!currentUser || !db || !classCode) return;
             if(unsubLeaderboard) unsubLeaderboard();
+
+            // Solo mostramos "Conectando" si realmente hay conexión a la base de datos
+            document.getElementById('leaderboard-list').innerHTML = `
+                <li class="text-center text-slate-500 font-bold py-4 flex flex-col items-center">
+                    <span class="text-3xl mb-2 animate-spin">⏳</span>
+                    Conectando con la clase...
+                </li>
+            `;
 
             const colRef = collection(db, 'artifacts', appId, 'public', 'data', classCode);
             
