@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ContaQuest - Aprende Jugando</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+        :root {
+            --ac-color: #38bdf8;  /* sky-400 (Activo Corriente) */
+            --anc-color: #facc15; /* yellow-400 (Activo No Corriente) */
+            --pc-color: #e879f9;  /* fuchsia-400 (Pasivo Corriente) */
+            --pnc-color: #9333ea; /* purple-600 (Pasivo No Corriente) */
+            --pn-color: #f472b6;  /* pink-400 (Patrimonio Neto) */
+        }
+
+        body { 
+            font-family: 'Nunito', sans-serif; 
+            background-color: #f1f5f9;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Neo-brutalism UI components */
+        .btn-game {
+            transition: all 0.1s;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.2);
+        }
+        .btn-game:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 rgba(0,0,0,0.2);
+        }
+
+        .card-shadow {
+            box-shadow: 8px 8px 0 rgba(0,0,0,0.8);
+            border: 3px solid #0f172a;
+        }
+
+        .hidden-view { display: none !important; }
+
+        /* Frog Game Animations */
+        @keyframes jumpRight {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, -40px) scale(1.1); }
+            100% { transform: translate(80px, 0) scale(1); }
+        }
+        @keyframes fallDown {
+            0% { transform: translateY(0) rotate(0); }
+            100% { transform: translateY(100px) rotate(180deg) scale(0); opacity: 0; }
+        }
+        .anim-jump { animation: jumpRight 0.4s ease forwards; }
+        .anim-fall { animation: fallDown 0.5s ease forwards; }
+
+        /* Candy Crush Grid */
+        #crush-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            background: #cbd5e1;
+            padding: 8px;
+            border-radius: 16px;
+        }
+        .crush-tile {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+            box-shadow: inset 0 -4px 0 rgba(0,0,0,0.2);
+            text-align: center;
+            padding: 2px;
+            overflow: hidden;
+        }
+        .crush-tile.selected { transform: scale(0.9); outline: 4px solid #fff; z-index: 10;}
+
+        /* Drag & Drop */
+        .draggable { cursor: grab; }
+        .draggable:active { cursor: grabbing; }
+        .dropzone.dragover { background-color: #f8fafc; border-style: dashed; }
+
+        /* Colors for Masses */
+        .bg-AC { background-color: var(--ac-color); }
+        .bg-ANC { background-color: var(--anc-color); }
+        .bg-PC { background-color: var(--pc-color); }
+        .bg-PNC { background-color: var(--pnc-color); }
+        .bg-PN { background-color: var(--pn-color); }
+
+        /* Progress Bar */
+        .progress-bar-fill { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    </style>
+</head>
+<body class="text-slate-800 flex flex-col min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-indigo-600 text-white p-4 sticky top-0 z-50 shadow-md">
+        <div class="container mx-auto max-w-4xl flex justify-between items-center">
+            <h1 class="text-2xl font-black flex items-center gap-2 cursor-pointer" onclick="showView('dashboard')">
+                🐸 ContaQuest
+            </h1>
+            <div class="flex gap-4 items-center">
+                <div class="bg-indigo-800 px-4 py-2 rounded-xl font-bold flex items-center gap-2">
+                    <span class="text-yellow-400">⭐</span>
+                    <span id="global-xp">0</span> XP
+                </div>
+                <button onclick="toggleSound()" id="sound-btn" class="text-2xl hover:scale-110 transition-transform">🔊</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto max-w-4xl p-4 md:p-6 relative">
+        
+        <!-- VISTA DE LOGIN (NUEVA) -->
+        <section id="view-login" class="h-full flex items-center justify-center min-h-[60vh]">
+            <div class="bg-white p-8 rounded-3xl card-shadow max-w-sm w-full text-center">
+                <div class="text-6xl mb-4">🏫</div>
+                <h2 class="text-3xl font-black text-indigo-900 mb-2">¡Bienvenido!</h2>
+                <p class="text-slate-500 font-bold mb-6 text-sm">Identifícate para unirte a tu clase</p>
+                
+                <input type="text" id="student-name" placeholder="Tu nombre o alias" class="w-full mb-4 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-indigo-500 outline-none transition-colors">
+                <input type="text" id="class-code" placeholder="Código de clase (ej: 1DAM)" class="w-full mb-6 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-indigo-500 outline-none uppercase transition-colors">
+                
+                <button onclick="loginStudent()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-xl btn-game text-lg hover:bg-indigo-500">Entrar a Clase</button>
+            </div>
+        </section>
+
+        <!-- DASHBOARD VIEW -->
+        <section id="view-dashboard" class="space-y-8 hidden-view">
+            <!-- Player Profile & Rank -->
+            <div class="bg-white rounded-3xl p-6 card-shadow flex flex-col md:flex-row items-center gap-6">
+                <div class="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-5xl border-4 border-indigo-600 shadow-inner shrink-0">
+                    🧑‍💼
+                </div>
+                <div class="flex-grow w-full">
+                    <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Tu Rango Actual</h2>
+                    <h3 id="rank-title" class="text-3xl font-black text-indigo-900 mb-2">Becario Contable</h3>
+                    <div class="h-4 bg-slate-200 rounded-full overflow-hidden border border-slate-300 relative">
+                        <div id="rank-progress" class="h-full bg-gradient-to-r from-yellow-400 to-orange-500 progress-bar-fill w-0"></div>
+                    </div>
+                    <p class="text-right text-xs font-bold text-slate-500 mt-1" id="rank-next">Faltan 100 XP para el siguiente rango</p>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-black text-slate-800">🎮 Minijuegos Contables</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Rana Contable -->
+                <div class="bg-[#10b981] text-white p-6 rounded-3xl card-shadow relative overflow-hidden group cursor-pointer" onclick="startGame('frog')">
+                    <div class="absolute -right-4 -bottom-4 text-8xl opacity-30 group-hover:scale-110 transition-transform">🐸</div>
+                    <h3 class="text-2xl font-black mb-2">1. La Rana Contable</h3>
+                    <p class="font-bold mb-4 opacity-90">Cruza el río clasificando cuentas en 30 segundos.</p>
+                    <button class="bg-white text-[#10b981] px-6 py-2 rounded-full font-black btn-game">Jugar Ahora</button>
+                </div>
+
+                <!-- Conta-Crush -->
+                <div class="bg-[#f43f5e] text-white p-6 rounded-3xl card-shadow relative overflow-hidden group cursor-pointer" onclick="startGame('crush')">
+                    <div class="absolute -right-4 -bottom-4 text-8xl opacity-30 group-hover:scale-110 transition-transform">🍬</div>
+                    <h3 class="text-2xl font-black mb-2">2. Conta-Crush</h3>
+                    <p class="font-bold mb-4 opacity-90">Junta 3 cuentas de la misma masa para explotarlas.</p>
+                    <button class="bg-white text-[#f43f5e] px-6 py-2 rounded-full font-black btn-game">Jugar Ahora</button>
+                </div>
+
+                <!-- Drag & Drop -->
+                <div class="bg-[#8b5cf6] text-white p-6 rounded-3xl card-shadow relative overflow-hidden group cursor-pointer" onclick="startGame('drag')">
+                    <div class="absolute -right-4 -bottom-4 text-8xl opacity-30 group-hover:scale-110 transition-transform">📦</div>
+                    <h3 class="text-2xl font-black mb-2">3. Clasificador</h3>
+                    <p class="font-bold mb-4 opacity-90">Arrastra cada cuenta a su caja correcta sin límite de tiempo.</p>
+                    <button class="bg-white text-[#8b5cf6] px-6 py-2 rounded-full font-black btn-game">Jugar Ahora</button>
+                </div>
+
+                <!-- Balance -->
+                <div class="bg-[#f59e0b] text-white p-6 rounded-3xl card-shadow relative overflow-hidden group cursor-pointer" onclick="startGame('balance')">
+                    <div class="absolute -right-4 -bottom-4 text-8xl opacity-30 group-hover:scale-110 transition-transform">⚖️</div>
+                    <h3 class="text-2xl font-black mb-2">4. Constructor Balance</h3>
+                    <p class="font-bold mb-4 opacity-90">Cuadra el Activo = Pasivo + PN arrastrando valores.</p>
+                    <button class="bg-white text-[#f59e0b] px-6 py-2 rounded-full font-black btn-game">Jugar Ahora</button>
+                </div>
+            </div>
+
+            <!-- RANKING DE CLASE -->
+            <div class="mt-8">
+                <h2 class="text-2xl font-black text-slate-800 mb-4 flex items-center gap-2">
+                    🏆 Ranking de Clase: <span id="display-class-code" class="text-indigo-600 bg-indigo-100 px-3 py-1 rounded-lg text-xl"></span>
+                </h2>
+                <div class="bg-white rounded-3xl p-6 card-shadow min-h-[150px]">
+                    <ul id="leaderboard-list" class="space-y-3">
+                        <li class="text-center text-slate-500 font-bold py-4 flex flex-col items-center">
+                            <span class="text-3xl mb-2 animate-spin">⏳</span>
+                            Conectando con la clase...
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- JUEGO 1: RANA CONTABLE -->
+        <section id="view-frog" class="hidden-view h-full flex flex-col">
+            <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl card-shadow">
+                <button onclick="showView('dashboard')" class="font-bold text-slate-500 hover:text-slate-800">⬅ Volver</button>
+                <div class="text-xl font-black text-red-500 flex items-center gap-2">⏳ <span id="frog-timer">30</span>s</div>
+                <div class="text-xl font-black text-green-500 flex items-center gap-2">⭐ <span id="frog-score">0</span></div>
+            </div>
+
+            <div class="flex-grow relative bg-cyan-100 rounded-3xl card-shadow overflow-hidden flex flex-col items-center justify-center p-6 border-b-[20px] border-blue-400 min-h-[400px]">
+                <!-- Río y Piedras -->
+                <div class="absolute bottom-20 w-full flex justify-center gap-4 px-4" id="frog-river">
+                    <div class="w-16 h-8 bg-slate-500 rounded-[100%] border-b-4 border-slate-700"></div>
+                    <div class="w-16 h-8 bg-slate-500 rounded-[100%] border-b-4 border-slate-700"></div>
+                    <div class="w-16 h-8 bg-slate-500 rounded-[100%] border-b-4 border-slate-700"></div>
+                    <div class="w-16 h-8 bg-slate-500 rounded-[100%] border-b-4 border-slate-700"></div>
+                    <div class="w-16 h-8 bg-slate-500 rounded-[100%] border-b-4 border-slate-700"></div>
+                </div>
+                <!-- Rana -->
+                <div id="frog-sprite" class="text-6xl absolute bottom-24 z-10 transition-all duration-300" style="left: 20%; transform: translateX(-50%);">🐸</div>
+
+                <!-- Pregunta -->
+                <div class="bg-white p-6 rounded-3xl card-shadow z-20 text-center max-w-sm mb-32">
+                    <p class="text-sm font-bold text-slate-400 uppercase mb-2">¿A qué masa pertenece?</p>
+                    <h2 id="frog-account" class="text-3xl font-black text-indigo-900">(000) Cuenta</h2>
+                </div>
+            </div>
+
+            <!-- Botones de respuesta estructurados como Balance -->
+            <div class="grid grid-cols-2 gap-4 mt-4 w-full max-w-2xl mx-auto">
+                <!-- ACTIVO (Izquierda) -->
+                <div class="flex flex-col gap-2">
+                    <button onclick="checkFrogAnswer('ANC')" class="btn-game flex-1 bg-yellow-400 text-yellow-900 p-3 rounded-xl font-black text-sm border-2 border-yellow-600 hover:bg-yellow-300">Activo No Corriente</button>
+                    <button onclick="checkFrogAnswer('AC')" class="btn-game flex-1 bg-sky-400 text-sky-900 p-3 rounded-xl font-black text-sm border-2 border-sky-600 hover:bg-sky-300">Activo Corriente</button>
+                </div>
+                
+                <!-- PATRIMONIO Y PASIVO (Derecha) -->
+                <div class="flex flex-col gap-2">
+                    <button onclick="checkFrogAnswer('PN')" class="btn-game flex-1 bg-pink-400 text-pink-900 p-3 rounded-xl font-black text-sm border-2 border-pink-600 hover:bg-pink-300">Patrimonio Neto</button>
+                    <button onclick="checkFrogAnswer('PNC')" class="btn-game flex-1 bg-purple-600 text-white p-3 rounded-xl font-black text-sm border-2 border-purple-800 hover:bg-purple-500">Pasivo No Corriente</button>
+                    <button onclick="checkFrogAnswer('PC')" class="btn-game flex-1 bg-fuchsia-400 text-white p-3 rounded-xl font-black text-sm border-2 border-fuchsia-600 hover:bg-fuchsia-300">Pasivo Corriente</button>
+                </div>
+            </div>
+            
+            <!-- Pantalla fin de juego rana -->
+            <div id="frog-gameover" class="hidden absolute inset-0 bg-slate-900/95 z-50 flex flex-col items-center justify-center text-white p-6 text-center rounded-3xl">
+                <div class="text-8xl mb-4">⌛</div>
+                <h2 class="text-5xl font-black mb-2 text-yellow-400">¡TIEMPO!</h2>
+                <p class="text-2xl font-bold mb-8">Has conseguido <span id="frog-final-score">0</span> puntos XP.</p>
+                <button onclick="showView('dashboard')" class="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black text-xl btn-game">Volver al Inicio</button>
+            </div>
+        </section>
+
+        <!-- JUEGO 2: CONTA-CRUSH -->
+        <section id="view-crush" class="hidden-view h-full flex flex-col items-center">
+            <div class="w-full flex justify-between items-center mb-4 bg-white p-4 rounded-2xl card-shadow">
+                <button onclick="showView('dashboard')" class="font-bold text-slate-500 hover:text-slate-800">⬅ Volver</button>
+                <div class="text-center">
+                    <h2 class="text-xl font-black text-pink-600">Conta-Crush</h2>
+                    <p class="text-xs font-bold text-slate-400">Completa las 5 Masas</p>
+                </div>
+                <div class="flex gap-4">
+                    <div class="text-xl font-black text-red-500 flex items-center gap-2">⏳ <span id="crush-timer">60</span>s</div>
+                    <div class="text-xl font-black text-pink-500 flex items-center gap-2">⭐ <span id="crush-score">0</span></div>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-3xl card-shadow w-full max-w-md">
+                <div id="crush-grid">
+                    <!-- Grid generado por JS -->
+                </div>
+            </div>
+            
+            <!-- Panel de Objetivos -->
+            <div class="mt-4 grid grid-cols-2 gap-2 w-full max-w-md" id="crush-objectives">
+                <div id="prog-ANC" class="border-2 border-yellow-400 bg-yellow-50 rounded-xl p-2 transition-all opacity-60">
+                    <div class="text-[0.7rem] font-black text-yellow-800 flex justify-between items-center uppercase">Act. No Corriente <span class="counter text-xs font-normal opacity-70">(0/3)</span></div>
+                    <div class="text-[0.6rem] text-yellow-700/90 mt-1 font-bold leading-tight names min-h-[14px]"></div>
+                </div>
+                <div id="prog-AC" class="border-2 border-sky-400 bg-sky-50 rounded-xl p-2 transition-all opacity-60">
+                    <div class="text-[0.7rem] font-black text-sky-800 flex justify-between items-center uppercase">Act. Corriente <span class="counter text-xs font-normal opacity-70">(0/3)</span></div>
+                    <div class="text-[0.6rem] text-sky-700/90 mt-1 font-bold leading-tight names min-h-[14px]"></div>
+                </div>
+                <div id="prog-PN" class="col-span-2 border-2 border-pink-400 bg-pink-50 rounded-xl p-2 transition-all opacity-60">
+                    <div class="text-[0.7rem] font-black text-pink-800 flex justify-between items-center uppercase">Patrimonio Neto <span class="counter text-xs font-normal opacity-70">(0/3)</span></div>
+                    <div class="text-[0.6rem] text-pink-700/90 mt-1 font-bold leading-tight names min-h-[14px]"></div>
+                </div>
+                <div id="prog-PNC" class="border-2 border-purple-400 bg-purple-50 rounded-xl p-2 transition-all opacity-60">
+                    <div class="text-[0.7rem] font-black text-purple-800 flex justify-between items-center uppercase">Pas. No Corriente <span class="counter text-xs font-normal opacity-70">(0/3)</span></div>
+                    <div class="text-[0.6rem] text-purple-700/90 mt-1 font-bold leading-tight names min-h-[14px]"></div>
+                </div>
+                <div id="prog-PC" class="border-2 border-fuchsia-400 bg-fuchsia-50 rounded-xl p-2 transition-all opacity-60">
+                    <div class="text-[0.7rem] font-black text-fuchsia-800 flex justify-between items-center uppercase">Pas. Corriente <span class="counter text-xs font-normal opacity-70">(0/3)</span></div>
+                    <div class="text-[0.6rem] text-fuchsia-700/90 mt-1 font-bold leading-tight names min-h-[14px]"></div>
+                </div>
+            </div>
+
+            <!-- Pantalla fin de juego crush (Tiempo Agotado) -->
+            <div id="crush-gameover" class="hidden absolute inset-0 bg-slate-900/95 z-50 flex flex-col items-center justify-center text-white p-6 text-center rounded-3xl">
+                <div class="text-8xl mb-4">⌛</div>
+                <h2 class="text-5xl font-black mb-2 text-pink-500">¡TIEMPO!</h2>
+                <p class="text-2xl font-bold mb-2 text-slate-300">Puntuación final</p>
+                <div class="text-8xl font-black text-yellow-400 mb-8 drop-shadow-lg"><span id="crush-final-score">0</span></div>
+                <button onclick="showView('dashboard')" class="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black text-xl btn-game hover:bg-slate-200">Volver al Inicio</button>
+            </div>
+
+            <!-- Pantalla Victoria Crush -->
+            <div id="crush-win" class="hidden absolute inset-0 bg-slate-900/95 z-50 flex flex-col items-center justify-center text-white p-6 text-center rounded-3xl">
+                <div class="text-8xl mb-4">🎉</div>
+                <h2 class="text-4xl font-black mb-2 text-pink-500">¡MASAS COMPLETADAS!</h2>
+                <p class="text-xl font-bold text-slate-300 mb-6">Has reunido todas las masas</p>
+                
+                <div class="bg-white/10 p-6 rounded-3xl mb-8 border-4 border-yellow-400/30 backdrop-blur-sm w-full max-w-xs">
+                    <p class="text-lg font-bold mb-1 text-slate-300">Puntuación Total</p>
+                    <div class="text-7xl font-black text-yellow-400 mb-2 drop-shadow-lg"><span id="crush-win-score">0</span></div>
+                    <div class="inline-block bg-pink-500 text-white px-3 py-1 rounded-full text-sm font-black">+100 XP BONUS</div>
+                </div>
+
+                <button onclick="showView('dashboard')" class="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black text-xl btn-game hover:bg-slate-200">Volver al Inicio</button>
+            </div>
+        </section>
+
+        <!-- JUEGO 3: CLASIFICADOR (Drag & Drop) -->
+        <section id="view-drag" class="hidden-view h-full">
+            <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl card-shadow">
+                <button onclick="showView('dashboard')" class="font-bold text-slate-500 hover:text-slate-800">⬅ Volver</button>
+                <h2 class="text-xl font-black text-purple-600">Clasificador</h2>
+                <button onclick="startGame('drag')" class="font-bold text-purple-600 hover:text-purple-800">🔄 Reiniciar</button>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Origen de cuentas -->
+                <div class="bg-slate-200 p-4 rounded-3xl card-shadow min-h-[250px]" id="drag-source">
+                    <h3 class="text-center font-black text-slate-500 mb-4">Cuentas Pendientes</h3>
+                    <div id="drag-items-container" class="flex flex-wrap gap-2 justify-center">
+                        <!-- Cuentas generadas -->
+                    </div>
+                </div>
+
+                <!-- Cajas de destino -->
+                <div class="grid grid-cols-2 gap-3" id="drop-zones">
+                    <div class="flex flex-col gap-3">
+                        <div class="dropzone bg-yellow-50 border-4 border-yellow-300 rounded-2xl p-3 flex flex-col items-center flex-1 min-h-[120px]" data-mass="ANC">
+                            <span class="font-black text-yellow-800 text-sm mb-2 text-center pointer-events-none">Activo No Corriente</span>
+                        </div>
+                        <div class="dropzone bg-sky-50 border-4 border-sky-300 rounded-2xl p-3 flex flex-col items-center flex-1 min-h-[120px]" data-mass="AC">
+                            <span class="font-black text-sky-800 text-sm mb-2 text-center pointer-events-none">Activo Corriente</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-3">
+                        <div class="dropzone bg-pink-50 border-4 border-pink-300 rounded-2xl p-3 flex flex-col items-center flex-1 min-h-[100px]" data-mass="PN">
+                            <span class="font-black text-pink-800 text-sm mb-2 text-center pointer-events-none">Patrimonio Neto</span>
+                        </div>
+                        <div class="dropzone bg-purple-50 border-4 border-purple-300 rounded-2xl p-3 flex flex-col items-center flex-1 min-h-[100px]" data-mass="PNC">
+                            <span class="font-black text-purple-800 text-sm mb-2 text-center pointer-events-none">Pasivo No Corriente</span>
+                        </div>
+                        <div class="dropzone bg-fuchsia-50 border-4 border-fuchsia-300 rounded-2xl p-3 flex flex-col items-center flex-1 min-h-[100px]" data-mass="PC">
+                            <span class="font-black text-fuchsia-800 text-sm mb-2 text-center pointer-events-none">Pasivo Corriente</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Modal Victoria Drag -->
+            <div id="drag-win" class="hidden absolute inset-0 bg-slate-900/80 z-50 flex items-center justify-center rounded-3xl">
+                <div class="bg-white p-8 rounded-3xl card-shadow text-center">
+                    <div class="text-6xl mb-4">🏆</div>
+                    <h2 class="text-3xl font-black text-purple-600 mb-2">¡Perfecto!</h2>
+                    <p class="font-bold text-slate-500 mb-6">+50 XP ganados</p>
+                    <button onclick="showView('dashboard')" class="btn-game bg-purple-600 text-white px-6 py-3 rounded-xl font-black">Genial</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- JUEGO 4: CONSTRUCTOR DE BALANCE -->
+        <section id="view-balance" class="hidden-view h-full">
+            <div class="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl card-shadow">
+                <button onclick="showView('dashboard')" class="font-bold text-slate-500 hover:text-slate-800">⬅ Volver</button>
+                <h2 class="text-xl font-black text-orange-500">A = P + PN</h2>
+                <div class="font-black text-slate-400"></div>
+            </div>
+
+            <div class="bg-white p-4 rounded-3xl card-shadow mb-6">
+                <h3 class="text-center font-bold text-slate-400 mb-2 text-sm">Arrastra las cuentas a su lado correspondiente</h3>
+                <div id="balance-items" class="flex flex-wrap gap-2 justify-center dropzone-bal min-h-[60px]" data-side="pool">
+                    <!-- Chips con valores -->
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Columna ACTIVO -->
+                <div class="bg-sky-50 border-4 border-sky-300 rounded-3xl p-4 card-shadow flex flex-col">
+                    <h3 class="text-xl font-black text-sky-800 text-center mb-4 border-b-2 border-sky-200 pb-2">ACTIVO</h3>
+                    <div id="zone-activo" class="flex-grow dropzone-bal min-h-[150px] flex flex-col gap-2" data-side="A"></div>
+                    <div class="mt-4 bg-sky-200 p-2 rounded-xl text-center font-black text-sky-900">
+                        Total A: <span id="sum-a">0</span>€
+                    </div>
+                </div>
+
+                <!-- Columna PASIVO + PN -->
+                <div class="bg-gradient-to-b from-pink-50 to-purple-50 border-4 border-purple-300 rounded-3xl p-4 card-shadow flex flex-col">
+                    <h3 class="text-xl font-black text-purple-800 text-center mb-4 border-b-2 border-purple-200 pb-2">PATRIMONIO + PASIVO</h3>
+                    <div id="zone-pasivo" class="flex-grow dropzone-bal min-h-[150px] flex flex-col gap-2" data-side="P"></div>
+                    <div class="mt-4 bg-purple-200 p-2 rounded-xl text-center font-black text-purple-900">
+                        Total P+PN: <span id="sum-p">0</span>€
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-center">
+                <button onclick="verifyBalance()" class="btn-game bg-orange-500 text-white px-10 py-4 rounded-2xl font-black text-xl shadow-xl w-full md:w-auto">
+                    Comprobar Cuadre ✅
+                </button>
+            </div>
+            
+             <!-- Modal Victoria Balance -->
+             <div id="balance-win" class="hidden absolute inset-0 bg-slate-900/80 z-50 flex items-center justify-center rounded-3xl">
+                <div class="bg-white p-8 rounded-3xl card-shadow text-center">
+                    <div class="text-6xl mb-4">⚖️</div>
+                    <h2 class="text-3xl font-black text-orange-500 mb-2">¡Balance Cuadrado!</h2>
+                    <p class="font-bold text-slate-500 mb-6">+100 XP ganados</p>
+                    <button onclick="showView('dashboard')" class="btn-game bg-orange-500 text-white px-6 py-3 rounded-xl font-black">Volver</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- BASE DE DATOS DE CUENTAS ---
+        const ACCOUNTS = [
+            { id: '100', name: 'Capital social', mass: 'PN', group: 1 },
+            { id: '112', name: 'Reserva legal', mass: 'PN', group: 1 },
+            { id: '129', name: 'Resultado del ejercicio', mass: 'PN', group: 1 },
+            { id: '206', name: 'Aplicaciones informáticas', mass: 'ANC', group: 2 },
+            { id: '211', name: 'Construcciones', mass: 'ANC', group: 2 },
+            { id: '216', name: 'Mobiliario', mass: 'ANC', group: 2 },
+            { id: '217', name: 'Equipos proc. de info', mass: 'ANC', group: 2 },
+            { id: '218', name: 'Elementos de transporte', mass: 'ANC', group: 2 },
+            { id: '300', name: 'Mercaderías', mass: 'AC', group: 3 },
+            { id: '430', name: 'Clientes', mass: 'AC', group: 4 },
+            { id: '570', name: 'Caja, euros', mass: 'AC', group: 5 },
+            { id: '572', name: 'Bancos c/c', mass: 'AC', group: 5 },
+            { id: '400', name: 'Proveedores', mass: 'PC', group: 4 },
+            { id: '410', name: 'Acreedores', mass: 'PC', group: 4 },
+            { id: '170', name: 'Deudas L/P ent. crédito', mass: 'PNC', group: 1 },
+            { id: '173', name: 'Proveedores inmov. L/P', mass: 'PNC', group: 1 },
+            { id: '175', name: 'Efectos a pagar a L/P', mass: 'PNC', group: 1 },
+            { id: '520', name: 'Deudas C/P ent. crédito', mass: 'PC', group: 5 },
+            { id: '523', name: 'Proveedores inmov. C/P', mass: 'PC', group: 5 }
+        ];
+
+        // --- SISTEMA DE PROGRESIÓN ---
+        const RANKS = [
+            { name: 'Becario Contable', xpReq: 0 },
+            { name: 'Auxiliar Administrativo', xpReq: 100 },
+            { name: 'Contable', xpReq: 300 },
+            { name: 'Jefe de Contabilidad', xpReq: 600 },
+            { name: 'Director Financiero', xpReq: 1000 }
+        ];
+
+        let appState = {
+            xp: 0,
+            rankIdx: 0,
+            playerName: '',
+            classCode: ''
+        };
+
+        // --- FUNCIONES DE LOGIN ---
+        function loginStudent() {
+            const name = document.getElementById('student-name').value.trim();
+            let code = document.getElementById('class-code').value.trim().toUpperCase();
+            
+            if(!name) { 
+                alert("Por favor, introduce tu nombre o alias."); 
+                return; 
+            }
+            if(!code) code = "GENERAL";
+
+            appState.playerName = name;
+            appState.classCode = code;
+            
+            // Permitir que el estado global sea accesible
+            window.appState = appState;
+            window.RANKS = RANKS;
+
+            document.getElementById('display-class-code').innerText = code;
+            
+            // Notificar al módulo de multijugador (Firebase)
+            window.dispatchEvent(new CustomEvent('player-login', { detail: appState }));
+            
+            showView('dashboard');
+        }
+
+        // --- SISTEMA DE AUDIO (Web Audio API) ---
+        let audioCtx;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleSound() {
+            initAudio();
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-btn').innerText = soundEnabled ? '🔊' : '🔇';
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            initAudio();
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+            
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'correct' || type === 'match') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.setValueAtTime(1200, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'win' || type === 'levelup') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(500, now + 0.1);
+                osc.frequency.setValueAtTime(600, now + 0.2);
+                osc.frequency.setValueAtTime(800, now + 0.3);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.6);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            } else if (type === 'gameover') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.8);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.8);
+                osc.start(now);
+                osc.stop(now + 0.8);
+            }
+        }
+
+        // --- FUNCIONES GENERALES ---
+        function addXP(points) {
+            appState.xp += points;
+            document.getElementById('global-xp').innerText = appState.xp;
+            
+            // Comprobar ascenso
+            let newRankIdx = 0;
+            for(let i = RANKS.length - 1; i >= 0; i--) {
+                if(appState.xp >= RANKS[i].xpReq) {
+                    newRankIdx = i;
+                    break;
+                }
+            }
+            
+            if(newRankIdx > appState.rankIdx) {
+                appState.rankIdx = newRankIdx;
+                playSound('levelup');
+                alert(`🎉 ¡Enhorabuena! Has ascendido a ${RANKS[newRankIdx].name}`);
+            }
+            updateDashboard();
+
+            // Notificar subida de XP al servidor multijugador
+            window.dispatchEvent(new CustomEvent('xp-updated', { detail: appState }));
+        }
+
+        function updateDashboard() {
+            const currentRank = RANKS[appState.rankIdx];
+            const nextRank = RANKS[appState.rankIdx + 1];
+            
+            document.getElementById('rank-title').innerText = currentRank.name;
+            
+            if (nextRank) {
+                const xpNeeded = nextRank.xpReq - currentRank.xpReq;
+                const xpGained = appState.xp - currentRank.xpReq;
+                const percent = Math.min(100, Math.max(0, (xpGained / xpNeeded) * 100));
+                
+                document.getElementById('rank-progress').style.width = `${percent}%`;
+                document.getElementById('rank-next').innerText = `Faltan ${nextRank.xpReq - appState.xp} XP para ${nextRank.name}`;
+            } else {
+                document.getElementById('rank-progress').style.width = `100%`;
+                document.getElementById('rank-next').innerText = `¡Nivel Máximo Alcanzado!`;
+            }
+        }
+
+        function showView(viewId) {
+            // Forzar login si no hay nombre registrado
+            if(viewId !== 'login' && !appState.playerName) {
+                viewId = 'login'; 
+            }
+            
+            // Detener temporizadores si existen
+            if(frogTimer) clearInterval(frogTimer);
+            if(typeof crushTimer !== 'undefined') clearInterval(crushTimer);
+            
+            document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden-view'));
+            document.getElementById(`view-${viewId}`).classList.remove('hidden-view');
+            window.scrollTo(0,0);
+        }
+
+        function startGame(game) {
+            showView(game);
+            if(game === 'frog') initFrogGame();
+            if(game === 'crush') initCrushGame();
+            if(game === 'drag') initDragGame();
+            if(game === 'balance') initBalanceGame();
+        }
+
+        // ==========================================
+        // JUEGO 1: RANA CONTABLE
+        // ==========================================
+        let frogTimer, frogTimeLeft, frogScore, currentFrogAcc;
+        const frogPosArr = ['20%', '35%', '50%', '65%', '80%'];
+        let frogPosIdx = 0;
+
+        function initFrogGame() {
+            frogTimeLeft = 30;
+            frogScore = 0;
+            frogPosIdx = 0;
+            document.getElementById('frog-timer').innerText = frogTimeLeft;
+            document.getElementById('frog-score').innerText = frogScore;
+            document.getElementById('frog-gameover').classList.add('hidden');
+            
+            clearInterval(frogTimer);
+            frogTimer = setInterval(() => {
+                frogTimeLeft--;
+                document.getElementById('frog-timer').innerText = frogTimeLeft;
+                if(frogTimeLeft <= 0) endFrogGame();
+            }, 1000);
+
+            nextFrogAccount();
+            updateFrogPos(false);
+        }
+
+        function nextFrogAccount() {
+            currentFrogAcc = ACCOUNTS[Math.floor(Math.random() * ACCOUNTS.length)];
+            document.getElementById('frog-account').innerText = `(${currentFrogAcc.id}) ${currentFrogAcc.name}`;
+        }
+
+        function updateFrogPos(animate) {
+            const frog = document.getElementById('frog-sprite');
+            if(animate) {
+                frog.classList.remove('anim-jump', 'anim-fall');
+                void frog.offsetWidth; // reiniciar animación
+                frog.classList.add('anim-jump');
+                setTimeout(() => {
+                    frog.style.left = frogPosArr[frogPosIdx];
+                }, 400);
+            } else {
+                frog.style.left = frogPosArr[frogPosIdx];
+            }
+        }
+
+        function checkFrogAnswer(mass) {
+            if(frogTimeLeft <= 0) return;
+            const frog = document.getElementById('frog-sprite');
+            
+            if(mass === currentFrogAcc.mass) {
+                // Acierto
+                frogScore += 10;
+                document.getElementById('frog-score').innerText = frogScore;
+                frogPosIdx = (frogPosIdx + 1) % frogPosArr.length;
+                updateFrogPos(true);
+                nextFrogAccount();
+            } else {
+                // Fallo
+                frog.classList.remove('anim-jump', 'anim-fall');
+                void frog.offsetWidth;
+                frog.classList.add('anim-fall');
+                frogScore = Math.max(0, frogScore - 5);
+                document.getElementById('frog-score').innerText = frogScore;
+                
+                setTimeout(() => {
+                    frogPosIdx = 0;
+                    frog.classList.remove('anim-fall');
+                    updateFrogPos(false);
+                    nextFrogAccount();
+                }, 600);
+            }
+        }
+
+        function endFrogGame() {
+            playSound('gameover');
+            clearInterval(frogTimer);
+            document.getElementById('frog-final-score').innerText = frogScore;
+            document.getElementById('frog-gameover').classList.remove('hidden');
+            addXP(frogScore);
+        }
+
+        // ==========================================
+        // JUEGO 2: CONTA-CRUSH
+        // ==========================================
+        const GRID_SIZE = 5;
+        let crushGrid = [];
+        let crushScore = 0;
+        let selectedTile = null;
+        let crushTimer, crushTimeLeft;
+        let crushProgress = {};
+        let crushMatchedNames = {};
+
+        function initCrushGame() {
+            crushScore = 0;
+            crushTimeLeft = 60;
+            selectedTile = null;
+            crushProgress = { 'AC': false, 'ANC': false, 'PC': false, 'PNC': false, 'PN': false };
+            crushMatchedNames = { 'AC': [], 'ANC': [], 'PC': [], 'PNC': [], 'PN': [] };
+            
+            document.getElementById('crush-score').innerText = crushScore;
+            document.getElementById('crush-timer').innerText = crushTimeLeft;
+            document.getElementById('crush-gameover').classList.add('hidden');
+            document.getElementById('crush-win').classList.add('hidden');
+            
+            updateCrushProgressUI();
+
+            if(typeof crushTimer !== 'undefined') clearInterval(crushTimer);
+            crushTimer = setInterval(() => {
+                crushTimeLeft--;
+                document.getElementById('crush-timer').innerText = crushTimeLeft;
+                if(crushTimeLeft <= 0) endCrushGame();
+            }, 1000);
+
+            generateCrushGrid();
+            renderCrushGrid();
+        }
+
+        function endCrushGame() {
+            playSound('gameover');
+            clearInterval(crushTimer);
+            document.getElementById('crush-final-score').innerText = crushScore;
+            document.getElementById('crush-gameover').classList.remove('hidden');
+        }
+
+        function checkCrushWin() {
+            if(Object.values(crushProgress).every(v => v === true)) {
+                playSound('win');
+                clearInterval(crushTimer);
+                document.getElementById('crush-win-score').innerText = crushScore;
+                document.getElementById('crush-win').classList.remove('hidden');
+                addXP(100); // Bonus por ganar
+            }
+        }
+
+        function updateCrushProgressUI() {
+            Object.keys(crushProgress).forEach(mass => {
+                const progDiv = document.getElementById(`prog-${mass}`);
+                const counterSpan = progDiv.querySelector('.counter');
+                const namesDiv = progDiv.querySelector('.names');
+                
+                const uniqueCount = Math.min(3, crushMatchedNames[mass].length);
+                counterSpan.innerText = `(${uniqueCount}/3)`;
+                namesDiv.innerText = crushMatchedNames[mass].slice(0, 3).join(', ');
+
+                if(crushProgress[mass]) {
+                    progDiv.classList.remove('opacity-60');
+                    progDiv.classList.add('bg-white', 'shadow-md', 'scale-105');
+                } else {
+                    progDiv.classList.add('opacity-60');
+                    progDiv.classList.remove('bg-white', 'shadow-md', 'scale-105');
+                }
+            });
+        }
+
+        function generateCrushGrid() {
+            crushGrid = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                let row = [];
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    row.push(getRandomAccount());
+                }
+                crushGrid.push(row);
+            }
+            // Evitar matches iniciales
+            while(checkMatches().length > 0) {
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        crushGrid[r][c] = getRandomAccount();
+                    }
+                }
+            }
+        }
+
+        function getRandomAccount() {
+            return {...ACCOUNTS[Math.floor(Math.random() * ACCOUNTS.length)]};
+        }
+
+        function renderCrushGrid() {
+            const container = document.getElementById('crush-grid');
+            container.innerHTML = '';
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const acc = crushGrid[r][c];
+                    const tile = document.createElement('div');
+                    tile.className = `crush-tile bg-${acc.mass}`;
+                    // Mostrar ID y Nombre de la cuenta
+                    tile.innerHTML = `<span class="font-black text-[0.9rem] leading-none">${acc.id}</span>
+                                      <span class="text-[0.55rem] font-bold leading-tight truncate w-full px-1 mt-1">${acc.name}</span>`;
+                    tile.dataset.r = r;
+                    tile.dataset.c = c;
+                    
+                    if(selectedTile && selectedTile.r === r && selectedTile.c === c) {
+                        tile.classList.add('selected');
+                    }
+                    
+                    tile.onclick = () => handleTileClick(r, c);
+                    container.appendChild(tile);
+                }
+            }
+        }
+
+        function handleTileClick(r, c) {
+            if(!selectedTile) {
+                selectedTile = {r, c};
+                renderCrushGrid();
+            } else {
+                // Comprobar si es adyacente
+                const isAdjacent = (Math.abs(selectedTile.r - r) === 1 && selectedTile.c === c) || 
+                                   (Math.abs(selectedTile.c - c) === 1 && selectedTile.r === r);
+                
+                if(isAdjacent) {
+                    // Intercambiar
+                    let temp = crushGrid[r][c];
+                    crushGrid[r][c] = crushGrid[selectedTile.r][selectedTile.c];
+                    crushGrid[selectedTile.r][selectedTile.c] = temp;
+                    
+                    const matches = checkMatches();
+                    if(matches.length > 0) {
+                        processMatches(matches);
+                    } else {
+                        // Deshacer si no hay match
+                        temp = crushGrid[r][c];
+                        crushGrid[r][c] = crushGrid[selectedTile.r][selectedTile.c];
+                        crushGrid[selectedTile.r][selectedTile.c] = temp;
+                    }
+                }
+                selectedTile = null;
+                renderCrushGrid();
+            }
+        }
+
+        function checkMatches() {
+            let matched = [];
+            // Filas
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE - 2; c++) {
+                    let mass = crushGrid[r][c].mass;
+                    if (crushGrid[r][c+1].mass === mass && crushGrid[r][c+2].mass === mass) {
+                        matched.push({r,c}, {r,c:c+1}, {r,c:c+2});
+                    }
+                }
+            }
+            // Columnas
+            for (let c = 0; c < GRID_SIZE; c++) {
+                for (let r = 0; r < GRID_SIZE - 2; r++) {
+                    let mass = crushGrid[r][c].mass;
+                    if (crushGrid[r+1][c].mass === mass && crushGrid[r+2][c].mass === mass) {
+                        matched.push({r,c}, {r:r+1,c}, {r:r+2,c});
+                    }
+                }
+            }
+            // Filtrar duplicados
+            return matched.filter((v,i,a)=>a.findIndex(t=>(t.r===v.r && t.c===v.c))===i);
+        }
+
+        function processMatches(matches) {
+            crushScore += matches.length * 5;
+            document.getElementById('crush-score').innerText = crushScore;
+            addXP(matches.length * 2);
+
+            // Registrar las masas y nombres conseguidos
+            matches.forEach(m => {
+                let acc = crushGrid[m.r][m.c];
+                if (!crushMatchedNames[acc.mass].includes(acc.name)) {
+                    crushMatchedNames[acc.mass].push(acc.name);
+                }
+            });
+
+            Object.keys(crushMatchedNames).forEach(mass => {
+                if (crushMatchedNames[mass].length >= 3 && !crushProgress[mass]) {
+                    crushProgress[mass] = true;
+                }
+            });
+            
+            updateCrushProgressUI();
+            checkCrushWin();
+
+            // Reemplazar por nuevas
+            matches.forEach(m => {
+                crushGrid[m.r][m.c] = getRandomAccount();
+            });
+            
+            // Reacciones en cadena
+            setTimeout(() => {
+                const newMatches = checkMatches();
+                if(newMatches.length > 0) processMatches(newMatches);
+                renderCrushGrid();
+            }, 300);
+        }
+
+        // ==========================================
+        // JUEGO 3: CLASIFICADOR (DRAG & DROP)
+        // ==========================================
+        let dragItemsCount = 0;
+        let dragCorrectCount = 0;
+
+        function initDragGame() {
+            document.getElementById('drag-win').classList.add('hidden');
+            const container = document.getElementById('drag-items-container');
+            container.innerHTML = '';
+            dragCorrectCount = 0;
+            
+            // Elegir 8 cuentas aleatorias
+            let shuffled = [...ACCOUNTS].sort(() => 0.5 - Math.random()).slice(0, 8);
+            dragItemsCount = shuffled.length;
+
+            shuffled.forEach(acc => {
+                const el = document.createElement('div');
+                el.className = "draggable bg-white border-2 border-slate-300 px-3 py-2 rounded-xl text-sm font-bold shadow-sm inline-block";
+                el.draggable = true;
+                el.innerText = `${acc.id} - ${acc.name}`;
+                el.dataset.mass = acc.mass;
+                
+                el.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', acc.mass);
+                    el.dataset.dragging = 'true';
+                    setTimeout(() => el.classList.add('opacity-50'), 0);
+                });
+                
+                el.addEventListener('dragend', (e) => {
+                    el.classList.remove('opacity-50');
+                    delete el.dataset.dragging;
+                });
+
+                container.appendChild(el);
+            });
+
+            // Configurar zonas destino
+            document.querySelectorAll('#drop-zones .dropzone').forEach(zone => {
+                // Limpiar zona excepto el título
+                Array.from(zone.children).forEach(c => { if(c.tagName !== 'SPAN') c.remove(); });
+                
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    zone.classList.add('dragover');
+                });
+                
+                zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+                
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('dragover');
+                    const draggedMass = e.dataTransfer.getData('text/plain');
+                    const zoneMass = zone.dataset.mass;
+                    
+                    const draggedElement = document.querySelector('[data-dragging="true"]');
+                    if(!draggedElement) return;
+
+                    if(draggedMass === zoneMass) {
+                        draggedElement.draggable = false;
+                        draggedElement.className = "bg-white/90 px-2 py-1 rounded text-xs font-bold shadow w-full mb-1 border border-slate-200 text-slate-700";
+                        zone.appendChild(draggedElement);
+                        dragCorrectCount++;
+                        
+                        if(dragCorrectCount === dragItemsCount) {
+                            setTimeout(() => {
+                                playSound('win');
+                                document.getElementById('drag-win').classList.remove('hidden');
+                                addXP(50);
+                            }, 300);
+                        }
+                    }
+                });
+            });
+        }
+
+        // ==========================================
+        // JUEGO 4: CONSTRUCTOR DE BALANCE
+        // ==========================================
+        const balScenario = [
+            { id: '100', name: 'Capital social', val: 50000, type: 'P' },
+            { id: '211', name: 'Construcciones', val: 80000, type: 'A' },
+            { id: '300', name: 'Mercaderías', val: 15000, type: 'A' },
+            { id: '400', name: 'Proveedores', val: 20000, type: 'P' },
+            { id: '572', name: 'Bancos', val: 25000, type: 'A' },
+            { id: '170', name: 'Deudas L/P', val: 50000, type: 'P' }
+        ];
+
+        function initBalanceGame() {
+            document.getElementById('balance-win').classList.add('hidden');
+            const container = document.getElementById('balance-items');
+            container.innerHTML = '';
+            document.getElementById('zone-activo').innerHTML = '';
+            document.getElementById('zone-pasivo').innerHTML = '';
+            updateBalanceSums();
+
+            let shuffled = [...balScenario].sort(() => 0.5 - Math.random());
+            
+            shuffled.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = "bg-white border-2 border-slate-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm inline-block cursor-grab mb-2 w-full text-center hover:bg-slate-50";
+                el.draggable = true;
+                el.innerHTML = `<span>${item.name}</span> <br/> <span class="text-orange-600 font-black text-lg">${item.val}€</span>`;
+                el.dataset.val = item.val;
+                el.dataset.type = item.type;
+                el.id = `bal-item-${index}`;
+                
+                el.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', el.id);
+                    setTimeout(() => el.classList.add('opacity-50'), 0);
+                });
+                
+                el.addEventListener('dragend', () => {
+                    el.classList.remove('opacity-50');
+                });
+
+                container.appendChild(el);
+            });
+
+            // Configurar zonas de drop (Activo, Pasivo, y Pool de inicio)
+            document.querySelectorAll('.dropzone-bal').forEach(zone => {
+                zone.addEventListener('dragover', e => e.preventDefault());
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const draggedId = e.dataTransfer.getData('text/plain');
+                    const dragged = document.getElementById(draggedId);
+                    if(dragged) {
+                        zone.appendChild(dragged);
+                        updateBalanceSums();
+                    }
+                });
+            });
+        }
+
+        function updateBalanceSums() {
+            let sumA = 0;
+            let sumP = 0;
+            
+            document.getElementById('zone-activo').querySelectorAll('div').forEach(d => {
+                if(d.dataset.val) sumA += parseInt(d.dataset.val);
+            });
+            document.getElementById('zone-pasivo').querySelectorAll('div').forEach(d => {
+                if(d.dataset.val) sumP += parseInt(d.dataset.val);
+            });
+
+            document.getElementById('sum-a').innerText = sumA.toLocaleString('es-ES');
+            document.getElementById('sum-p').innerText = sumP.toLocaleString('es-ES');
+        }
+
+        function verifyBalance() {
+            // Quitar el formateo para operar
+            const sumA = parseInt(document.getElementById('sum-a').innerText.replace(/\./g, ''));
+            const sumP = parseInt(document.getElementById('sum-p').innerText.replace(/\./g, ''));
+            
+            let isStrictCorrect = true;
+            document.getElementById('zone-activo').querySelectorAll('div[data-val]').forEach(d => {
+                if(d.dataset.type !== 'A') isStrictCorrect = false;
+            });
+            document.getElementById('zone-pasivo').querySelectorAll('div[data-val]').forEach(d => {
+                if(d.dataset.type !== 'P') isStrictCorrect = false;
+            });
+            
+            const itemsInPool = document.getElementById('balance-items').children.length;
+
+            if (itemsInPool === 0 && sumA === sumP && sumA > 0 && isStrictCorrect) {
+                playSound('win');
+                document.getElementById('balance-win').classList.remove('hidden');
+                addXP(100);
+            } else {
+                playSound('error');
+                // Timeout para asegurar que el sonido se reproduce antes del alert bloqueante
+                setTimeout(() => alert('El balance no cuadra o hay cuentas en la masa equivocada. ¡Sigue intentándolo!'), 50);
+            }
+        }
+
+        // Inicializar app
+        updateDashboard();
+        showView('login');
+    </script>
+
+    <!-- SISTEMA MULTIJUGADOR (FIREBASE) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let db, auth, currentUser;
+        let unsubLeaderboard = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'contaquest-default';
+
+        try {
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+            
+            if (firebaseConfig) {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                const initAuth = async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                };
+                initAuth();
+
+                onAuthStateChanged(auth, (user) => {
+                    currentUser = user;
+                    // Si el usuario se logueó antes de que cargara la DB, sincronizamos ahora
+                    if (user && window.appState && window.appState.playerName) {
+                        syncToLeaderboard(window.appState);
+                        listenToLeaderboard(window.appState.classCode);
+                    }
+                });
+
+                // Escuchar eventos desde el juego principal
+                window.addEventListener('player-login', (e) => {
+                    const state = e.detail;
+                    if(currentUser) {
+                        syncToLeaderboard(state);
+                        listenToLeaderboard(state.classCode);
+                    }
+                });
+
+                window.addEventListener('xp-updated', (e) => {
+                    const state = e.detail;
+                    if(currentUser && state.playerName) {
+                        syncToLeaderboard(state);
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn("Firebase no está disponible. Jugando en modo local.", error);
+            document.getElementById('leaderboard-list').innerHTML = '<li class="text-center text-slate-500 font-bold py-4">Modo local (Sin conexión a clase)</li>';
+        }
+
+        function syncToLeaderboard(state) {
+            if(!currentUser || !db || !state.classCode) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', state.classCode, currentUser.uid);
+            
+            let rankName = "Becario Contable";
+            try { rankName = window.RANKS[state.rankIdx].name; } catch(e){}
+
+            setDoc(docRef, {
+                name: state.playerName,
+                xp: state.xp,
+                rank: rankName,
+                uid: currentUser.uid
+            }).catch(e => console.error("Error guardando progreso:", e));
+        }
+
+        function listenToLeaderboard(classCode) {
+            if(!currentUser || !db || !classCode) return;
+            if(unsubLeaderboard) unsubLeaderboard();
+
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', classCode);
+            
+            unsubLeaderboard = onSnapshot(colRef, (snapshot) => {
+                const players = [];
+                snapshot.forEach(doc => players.push(doc.data()));
+                
+                // Ordenar por XP de mayor a menor
+                players.sort((a, b) => b.xp - a.xp);
+                renderLeaderboard(players);
+            }, (error) => {
+                console.error("Error leyendo ranking:", error);
+            });
+        }
+
+        function renderLeaderboard(players) {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = '';
+            
+            if(players.length === 0) {
+                list.innerHTML = '<li class="text-center text-slate-500 font-bold py-4">Aún no hay compañeros en esta clase. ¡Sé el primero en puntuar!</li>';
+                return;
+            }
+            
+            players.forEach((p, index) => {
+                let medal = `<span class="text-slate-400 font-black w-8 inline-block text-center">${index + 1}</span>`;
+                if(index === 0) medal = '<span class="text-2xl w-8 inline-block text-center drop-shadow-sm" title="Oro">🥇</span>';
+                else if(index === 1) medal = '<span class="text-2xl w-8 inline-block text-center drop-shadow-sm" title="Plata">🥈</span>';
+                else if(index === 2) medal = '<span class="text-2xl w-8 inline-block text-center drop-shadow-sm" title="Bronce">🥉</span>';
+                
+                const isMe = p.uid === currentUser.uid;
+                const bgClass = isMe ? 'bg-indigo-50 border-2 border-indigo-200 shadow-sm' : 'bg-slate-50 border-2 border-slate-100 hover:border-slate-300 transition-colors';
+                const nameColor = isMe ? 'text-indigo-900' : 'text-slate-700';
+
+                list.innerHTML += `
+                    <li class="flex items-center justify-between p-3 rounded-2xl ${bgClass}">
+                        <div class="flex items-center gap-3">
+                            ${medal}
+                            <div>
+                                <span class="font-black ${nameColor} text-lg">${p.name} ${isMe ? '<span class="text-xs text-indigo-500 ml-1">(Tú)</span>' : ''}</span>
+                                <span class="text-xs font-bold text-slate-500 block uppercase tracking-wide">${p.rank}</span>
+                            </div>
+                        </div>
+                        <div class="font-black text-indigo-600 bg-white px-3 py-1 rounded-xl shadow-sm border border-indigo-100">${p.xp} XP</div>
+                    </li>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
