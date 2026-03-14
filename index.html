@@ -125,6 +125,8 @@
                 <h2 class="text-3xl font-black text-indigo-900 mb-2">¡Bienvenido!</h2>
                 <p class="text-slate-500 font-bold mb-6 text-sm">Identifícate para unirte a tu clase</p>
                 
+                <p id="login-error" class="hidden text-red-500 font-bold mb-2 text-sm bg-red-50 p-2 rounded-lg"></p>
+                
                 <input type="text" id="student-name" placeholder="Tu nombre o alias" class="w-full mb-4 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-indigo-500 outline-none transition-colors">
                 <input type="text" id="class-code" placeholder="Código de clase (ej: 1DAM)" class="w-full mb-6 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold focus:border-indigo-500 outline-none uppercase transition-colors">
                 
@@ -415,6 +417,16 @@
                 </button>
             </div>
             
+            <!-- Modal de Error en Balance -->
+            <div id="balance-error" class="hidden absolute inset-0 bg-slate-900/80 z-50 flex items-center justify-center rounded-3xl">
+                <div class="bg-white p-8 rounded-3xl card-shadow text-center max-w-sm">
+                    <div class="text-6xl mb-4">⚠️</div>
+                    <h2 class="text-2xl font-black text-red-500 mb-2">¡Algo no cuadra!</h2>
+                    <p class="font-bold text-slate-500 mb-6">El balance no cuadra o hay cuentas en la masa equivocada. ¡Revisa los datos!</p>
+                    <button onclick="document.getElementById('balance-error').classList.add('hidden')" class="btn-game bg-red-500 text-white px-6 py-3 rounded-xl font-black">Seguir intentando</button>
+                </div>
+            </div>
+
              <!-- Modal Victoria Balance -->
              <div id="balance-win" class="hidden absolute inset-0 bg-slate-900/80 z-50 flex items-center justify-center rounded-3xl">
                 <div class="bg-white p-8 rounded-3xl card-shadow text-center">
@@ -472,11 +484,15 @@
         function loginStudent() {
             const name = document.getElementById('student-name').value.trim();
             let code = document.getElementById('class-code').value.trim().toUpperCase();
+            const errorMsg = document.getElementById('login-error');
             
             if(!name) { 
-                alert("Por favor, introduce tu nombre o alias."); 
+                errorMsg.innerText = "Por favor, introduce tu nombre o alias.";
+                errorMsg.classList.remove('hidden');
                 return; 
             }
+            errorMsg.classList.add('hidden');
+
             if(!code) code = "GENERAL";
 
             appState.playerName = name;
@@ -1096,8 +1112,7 @@
                 addXP(100);
             } else {
                 playSound('error');
-                // Timeout para asegurar que el sonido se reproduce antes del alert bloqueante
-                setTimeout(() => alert('El balance no cuadra o hay cuentas en la masa equivocada. ¡Sigue intentándolo!'), 50);
+                document.getElementById('balance-error').classList.remove('hidden');
             }
         }
 
@@ -1116,10 +1131,13 @@
         let unsubLeaderboard = null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'contaquest-default';
 
+        function setLocalMode() {
+            document.getElementById('leaderboard-list').innerHTML = '<li class="text-center text-slate-500 font-bold py-4">Modo local (Ranking Offline)</li>';
+        }
+
         try {
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-            
-            if (firebaseConfig) {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                const firebaseConfig = JSON.parse(__firebase_config);
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -1157,10 +1175,13 @@
                         syncToLeaderboard(state);
                     }
                 });
+            } else {
+                // No hay credenciales inyectadas, forzamos modo local
+                setLocalMode();
             }
         } catch (error) {
             console.warn("Firebase no está disponible. Jugando en modo local.", error);
-            document.getElementById('leaderboard-list').innerHTML = '<li class="text-center text-slate-500 font-bold py-4">Modo local (Sin conexión a clase)</li>';
+            setLocalMode();
         }
 
         function syncToLeaderboard(state) {
