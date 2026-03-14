@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ContaQuest - Aprende Jugando</title>
+    <title>ContaQuest - Bien Contabilizado</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
@@ -118,11 +118,19 @@
     <!-- Main Content -->
     <main class="flex-grow container mx-auto max-w-4xl p-4 md:p-6 relative">
         
-        <!-- VISTA DE LOGIN (NUEVA) -->
+        <!-- VISTA DE LOGIN -->
         <section id="view-login" class="h-full flex items-center justify-center min-h-[60vh]">
             <div class="bg-white p-8 rounded-3xl card-shadow max-w-sm w-full text-center">
-                <div class="text-6xl mb-4">🏫</div>
-                <h2 class="text-3xl font-black text-indigo-900 mb-2">¡Bienvenido!</h2>
+                
+                <!-- Logo BC: Intenta cargar tu imagen, si no, muestra el diseño CSS de respaldo -->
+                <div class="flex justify-center mb-6">
+                    <div class="w-24 h-24 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-5xl font-black card-shadow transform -rotate-3 overflow-hidden relative" title="Bien Contabilizado">
+                        <span class="absolute z-0">BC</span>
+                        <img src="image_1569d5.png" alt="Logo BC" class="w-full h-full object-cover z-10 relative bg-white" onerror="this.style.display='none'">
+                    </div>
+                </div>
+
+                <h2 class="text-3xl font-black text-indigo-900 mb-2">Bien Contabilizado</h2>
                 <p class="text-slate-500 font-bold mb-6 text-sm">Identifícate para unirte a tu clase</p>
                 
                 <p id="login-error" class="hidden text-red-500 font-bold mb-2 text-sm bg-red-50 p-2 rounded-lg"></p>
@@ -477,6 +485,16 @@
             classCode: ''
         };
 
+        // Cargar estado guardado si existe en el navegador
+        const savedState = localStorage.getItem('contaQuest_appState');
+        if (savedState) {
+            try {
+                appState = JSON.parse(savedState);
+            } catch (e) {
+                console.error("Error cargando partida guardada", e);
+            }
+        }
+
         // --- FUNCIONES DE LOGIN ---
         function loginStudent() {
             const name = document.getElementById('student-name').value.trim();
@@ -500,6 +518,9 @@
             window.RANKS = RANKS;
 
             document.getElementById('display-class-code').innerText = code;
+            
+            // Guardar en localStorage
+            localStorage.setItem('contaQuest_appState', JSON.stringify(appState));
             
             // Notificar al módulo de multijugador (Firebase)
             window.dispatchEvent(new CustomEvent('player-login', { detail: appState }));
@@ -602,6 +623,9 @@
             }
             updateDashboard();
 
+            // Guardar en localStorage
+            localStorage.setItem('contaQuest_appState', JSON.stringify(appState));
+
             // Notificar subida de XP al servidor multijugador
             window.dispatchEvent(new CustomEvent('xp-updated', { detail: appState }));
         }
@@ -611,6 +635,7 @@
             const nextRank = RANKS[appState.rankIdx + 1];
             
             document.getElementById('rank-title').innerText = currentRank.name;
+            document.getElementById('global-xp').innerText = appState.xp;
             
             if (nextRank) {
                 const xpNeeded = nextRank.xpReq - currentRank.xpReq;
@@ -632,7 +657,7 @@
             }
             
             // Detener temporizadores si existen
-            if(frogTimer) clearInterval(frogTimer);
+            if(typeof frogTimer !== 'undefined') clearInterval(frogTimer);
             if(typeof crushTimer !== 'undefined') clearInterval(crushTimer);
             
             document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden-view'));
@@ -1114,7 +1139,23 @@
 
         // Inicializar app
         updateDashboard();
-        showView('login');
+        
+        // Auto-login si ya hay datos guardados
+        if (appState.playerName) {
+            window.appState = appState;
+            window.RANKS = RANKS;
+            document.getElementById('display-class-code').innerText = appState.classCode || "GENERAL";
+            
+            // Retrasar ligeramente el evento para asegurar que los listeners de Firebase estén listos
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('player-login', { detail: appState }));
+            }, 100);
+            
+            showView('dashboard');
+        } else {
+            showView('login');
+        }
+
     </script>
 
     <!-- SISTEMA MULTIJUGADOR (FIREBASE Y MODO OFFLINE SIMULADO) -->
@@ -1129,7 +1170,6 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'contaquest-default';
 
         // --- BASE DE DATOS SIMULADA PARA GITHUB PAGES ---
-        // Nombres actualizados según petición:
         const MOCK_DATABASE = {
             "1ADG301": [
                 { uid: "mock1", name: "Profe Belén", xp: 1500, rank: "Director Financiero" },
